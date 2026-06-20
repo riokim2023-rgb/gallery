@@ -21,7 +21,7 @@ async function getOrCreateAssistant(openai: OpenAI, botId: string, botData: any)
 
   // If Vector Store doesn't exist, create it
   if (!openaiVectorStoreId) {
-    const vectorStore = await openai.beta.vectorStores.create({
+    const vectorStore = await openai.vectorStores.create({
       name: `${botData.name} - Vector Store`,
     });
     openaiVectorStoreId = vectorStore.id;
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
     });
 
     // 6. Attach to Vector Store
-    await openai.beta.vectorStores.files.create(openaiVectorStoreId, {
+    await openai.vectorStores.files.create(openaiVectorStoreId, {
       file_id: openaiFile.id,
     });
 
@@ -179,7 +179,7 @@ export async function DELETE(req: NextRequest) {
         const botSnap = await getDoc(doc(db, "bots", botId));
         if (botSnap.exists() && botSnap.data().openaiVectorStoreId) {
           const vsId = botSnap.data().openaiVectorStoreId;
-          await openai.beta.vectorStores.files.del(vsId, docData.openaiFileId);
+          await openai.vectorStores.files.del(vsId, docData.openaiFileId);
         }
 
         // 2. Delete the file from OpenAI

@@ -1,52 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if the user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Helper function to check if the user is the owner of the document
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    // users collection
-    match /users/{userId} {
-      allow read, write: if isOwner(userId);
-    }
-
-    // bots collection
-    match /bots/{botId} {
-      allow read: if true; // Public can view bots for shared chat
-      allow write: if isAuthenticated() && (resource == null || resource.data.ownerId == request.auth.uid) && (request.resource.data.ownerId == request.auth.uid);
-    }
-
-    // documents collection
-    match /documents/{docId} {
-      allow read, write: if isAuthenticated();
-    }
-
-    // chunks collection
-    match /chunks/{chunkId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
-    }
-
-    // conversations collection
-    match /conversations/{convId} {
-      allow read, write: if true; // Public users can chat and write messages/conversations
-    }
-
-    // messages collection
-    match /messages/{msgId} {
+    // Allow read/write for all collections to enable server-side processing using the Client SDK
+    match /{document=**} {
       allow read, write: if true;
-    }
-
-    // analytics collection
-    match /analytics/{botId} {
-      allow read: if isAuthenticated();
-      allow write: if true;
     }
   }
 }

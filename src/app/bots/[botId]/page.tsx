@@ -66,6 +66,9 @@ export default function BotDetail() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState("");
+  const [uploadMode, setUploadMode] = useState<"file" | "text">("file");
+  const [pastedTitle, setPastedTitle] = useState("");
+  const [pastedText, setPastedText] = useState("");
 
   // Chat Test State
   const [chatMessages, setChatMessages] = useState<MessageData[]>([]);
@@ -341,6 +344,86 @@ export default function BotDetail() {
     );
   };
 
+  // Handle Pasted Text Submit
+  const handleTextSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !botId) return;
+    if (!pastedTitle.trim()) {
+      setUploadError("문서 제목을 입력해 주세요.");
+      return;
+    }
+    if (!pastedText.trim()) {
+      setUploadError("문서 내용을 입력해 주세요.");
+      return;
+    }
+
+    setUploadError("");
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const fileName = `${pastedTitle.trim().replace(/[^a-zA-Z0-9가-힣_-\s]/g, "")}.txt`;
+      const blob = new Blob([pastedText], { type: "text/plain" });
+
+      const storagePath = `users/${user.uid}/bots/${botId}/files/${Date.now()}_${fileName}`;
+      const storageRef = ref(storage, storagePath);
+      const uploadTask = uploadBytesResumable(storageRef, blob);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          setUploadProgress(progress);
+        },
+        (err) => {
+          console.error("Text upload error", err);
+          setUploadError("텍스트 저장 도중 오류가 발생했습니다.");
+          setUploading(false);
+        },
+        async () => {
+          try {
+            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
+
+            // Create document in Firestore
+            const docRef = doc(collection(db, "documents"));
+            const docId = docRef.id;
+
+            await setDoc(docRef, {
+              id: docId,
+              botId: botId,
+              fileName: fileName,
+              fileType: "txt",
+              storagePath: storagePath,
+              status: "processing",
+              uploadedAt: serverTimestamp(),
+            });
+
+            // Trigger server processing API
+            fetch("/api/process-doc", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ docId, botId }),
+            }).catch((err) => console.error("Trigger processing error", err));
+
+            setUploading(false);
+            setUploadProgress(0);
+            setPastedTitle("");
+            setPastedText("");
+            setUploadMode("file");
+          } catch (err) {
+            console.error(err);
+            setUploadError("데이터베이스 등록 도중 오류가 발생했습니다.");
+            setUploading(false);
+          }
+        }
+      );
+    } catch (err: any) {
+      console.error(err);
+      setUploadError("파일 생성 중 오류가 발생했습니다.");
+      setUploading(false);
+    }
+  };
+
   // Handle Delete Document
   const handleDeleteDoc = async (docId: string, storagePath: string) => {
     if (!confirm("정말 이 문서를 삭제하시겠습니까? 관련 데이터가 모두 삭제됩니다.")) return;
@@ -569,33 +652,94 @@ export default function BotDetail() {
                   <p className="text-slate-400 text-xs">PDF, TXT, DOCX 문서 혹은 MP3, WAV 음성 자료를 업로드하세요 (최대 10MB).</p>
                 </div>
 
-                {/* Upload zone */}
-                <div className="relative p-8 rounded-2xl bg-slate-900/40 border-2 border-dashed border-slate-800 hover:border-indigo-500/50 transition-all flex flex-col items-center justify-center text-center group">
-                  <input
-                    type="file"
-                    accept=".pdf,.txt,.docx,.md,.mp3,.wav,.m4a"
-                    onChange={handleFileUpload}
-                    disabled={uploading}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
-                  />
-                  {uploading ? (
-                    <div className="flex flex-col items-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mb-3" />
-                      <span className="font-semibold text-sm mb-1">업로드 중...</span>
-                      <div className="w-48 bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
-                        <div className="bg-indigo-500 h-full transition-all duration-100" style={{ width: `${uploadProgress}%` }} />
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="p-3 bg-indigo-600/10 text-indigo-400 rounded-full mb-3 group-hover:bg-indigo-600/20 transition-colors">
-                        <Upload className="h-6 w-6" />
-                      </div>
-                      <span className="font-semibold text-sm text-slate-200">클릭하거나 파일을 드래그하여 업로드</span>
-                      <span className="text-xs text-slate-500 mt-1">PDF, TXT, DOCX, MD, MP3, WAV, M4A 지원</span>
-                    </>
-                  )}
+                {/* Upload Mode Selector (Tabs) */}
+                <div className="flex border-b border-slate-850 gap-4 mb-4 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => { setUploadMode("file"); setUploadError(""); }}
+                    className={`pb-2 px-1 border-b-2 transition-all cursor-pointer ${uploadMode === "file" ? "border-indigo-500 text-white" : "border-transparent text-slate-500 hover:text-slate-350"}`}
+                  >
+                    파일 업로드
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setUploadMode("text"); setUploadError(""); }}
+                    className={`pb-2 px-1 border-b-2 transition-all cursor-pointer ${uploadMode === "text" ? "border-indigo-500 text-white" : "border-transparent text-slate-500 hover:text-slate-350"}`}
+                  >
+                    텍스트 직접 입력 (붙여넣기)
+                  </button>
                 </div>
+
+                {uploadMode === "file" ? (
+                  /* Upload zone */
+                  <div className="relative p-8 rounded-2xl bg-slate-900/40 border-2 border-dashed border-slate-800 hover:border-indigo-500/50 transition-all flex flex-col items-center justify-center text-center group">
+                    <input
+                      type="file"
+                      accept=".pdf,.txt,.docx,.md,.mp3,.wav,.m4a"
+                      onChange={handleFileUpload}
+                      disabled={uploading}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                    />
+                    {uploading ? (
+                      <div className="flex flex-col items-center">
+                        <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mb-3" />
+                        <span className="font-semibold text-sm mb-1">업로드 중...</span>
+                        <div className="w-48 bg-slate-800 h-1.5 rounded-full overflow-hidden mt-1">
+                          <div className="bg-indigo-500 h-full transition-all duration-100" style={{ width: `${uploadProgress}%` }} />
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="p-3 bg-indigo-600/10 text-indigo-400 rounded-full mb-3 group-hover:bg-indigo-600/20 transition-colors">
+                          <Upload className="h-6 w-6" />
+                        </div>
+                        <span className="font-semibold text-sm text-slate-200">클릭하거나 파일을 드래그하여 업로드</span>
+                        <span className="text-xs text-slate-500 mt-1">PDF, TXT, DOCX, MD, MP3, WAV, M4A 지원</span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  /* Text Pasting Form */
+                  <form onSubmit={handleTextSubmit} className="space-y-4 bg-slate-900/20 p-5 rounded-2xl border border-slate-850">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-305 mb-1.5">문서 제목</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="예: 서양미술사 추가 요약노트"
+                        value={pastedTitle}
+                        onChange={(e) => setPastedTitle(e.target.value)}
+                        disabled={uploading}
+                        className="w-full h-10 px-4 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-white text-sm outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-305 mb-1.5">문서 내용 (복사해서 붙여넣기)</label>
+                      <textarea
+                        required
+                        placeholder="여기에 학습시킬 텍스트 내용을 자유롭게 붙여넣으세요..."
+                        value={pastedText}
+                        onChange={(e) => setPastedText(e.target.value)}
+                        disabled={uploading}
+                        className="w-full min-h-[140px] p-4 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-white text-sm outline-none resize-none"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={uploading}
+                      className="w-full h-10 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold shadow-md disabled:opacity-50 transition-all cursor-pointer text-sm"
+                    >
+                      {uploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          저장 및 학습 중... ({uploadProgress}%)
+                        </>
+                      ) : (
+                        "저장하고 학습시키기"
+                      )}
+                    </button>
+                  </form>
+                )}
 
                 {uploadError && (
                   <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">

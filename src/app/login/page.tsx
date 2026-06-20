@@ -3,8 +3,8 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Bot, Mail, Lock, User, Sparkles, Loader2, ArrowLeft } from "lucide-react";
@@ -22,6 +22,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
@@ -40,6 +41,57 @@ function LoginForm() {
       router.push("/dashboard");
     }
   }, [user, authLoading, router]);
+
+  const handleGoogleLogin = async () => {
+    setError("");
+    setSuccessMsg("");
+    setGoogleLoading(true);
+
+    try {
+      const provider = new GoogleAuthProvider();
+      const userCredential = await signInWithPopup(auth, provider);
+      const currentUser = userCredential.user;
+
+      // Check if user already exists in Firestore to avoid overwriting metadata/plan
+      const userRef = doc(db, "users", currentUser.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        await setDoc(userRef, {
+          id: currentUser.uid,
+          email: currentUser.email,
+          name: currentUser.displayName || "이름 없음",
+          photoUrl: currentUser.photoURL || "",
+          plan: "free",
+          createdAt: new Date().toISOString(),
+        });
+      } else {
+        // Update user name/avatar if they exist and are different
+        await setDoc(
+          userRef,
+          {
+            email: currentUser.email,
+            name: currentUser.displayName || userSnap.data()?.name || "이름 없음",
+            photoUrl: currentUser.photoURL || userSnap.data()?.photoUrl || "",
+          },
+          { merge: true }
+        );
+      }
+
+      router.push("/dashboard");
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === "auth/popup-closed-by-user") {
+        setError("로그인 팝업이 닫혔습니다. 다시 시도해주세요.");
+      } else if (err.code === "auth/cancelled-popup-request") {
+        setError("로그인 요청이 취소되었습니다.");
+      } else {
+        setError(err.message || "구글 로그인 중 오류가 발생했습니다.");
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,6 +201,55 @@ function LoginForm() {
               </div>
             )}
 
+            {/* Google Login Button */}
+            {!isResetPassword && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={loading || googleLoading}
+                  className="w-full h-11 flex items-center justify-center gap-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-900 font-semibold shadow-md disabled:opacity-50 transition-all duration-300 mb-6 text-sm cursor-pointer border border-slate-200"
+                >
+                  {googleLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                      구글 로그인 중...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                          fill="#4285F4"
+                        />
+                        <path
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.77c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                          fill="#34A853"
+                        />
+                        <path
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                          fill="#FBBC05"
+                        />
+                        <path
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                          fill="#EA4335"
+                        />
+                      </svg>
+                      Google로 시작하기
+                    </>
+                  )}
+                </button>
+
+                <div className="relative flex py-2 items-center mb-6">
+                  <div className="flex-grow border-t border-slate-800/80"></div>
+                  <span className="flex-shrink mx-4 text-xs font-semibold text-slate-500">
+                    또는 이메일로 {isSignUp ? "가입" : "로그인"}
+                  </span>
+                  <div className="flex-grow border-t border-slate-800/80"></div>
+                </div>
+              </>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-5">
               {isSignUp && !isResetPassword && (
                 <div>
@@ -161,7 +262,8 @@ function LoginForm() {
                       placeholder="홍길동"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full h-11 pl-11 pr-4 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-white placeholder-slate-650 transition-all text-sm outline-none"
+                      disabled={loading || googleLoading}
+                      className="w-full h-11 pl-11 pr-4 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-white placeholder-slate-650 transition-all text-sm outline-none disabled:opacity-50"
                     />
                   </div>
                 </div>
@@ -177,7 +279,8 @@ function LoginForm() {
                     placeholder="name@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full h-11 pl-11 pr-4 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-white placeholder-slate-650 transition-all text-sm outline-none"
+                    disabled={loading || googleLoading}
+                    className="w-full h-11 pl-11 pr-4 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-white placeholder-slate-650 transition-all text-sm outline-none disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -193,7 +296,8 @@ function LoginForm() {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full h-11 pl-11 pr-4 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-white placeholder-slate-650 transition-all text-sm outline-none"
+                      disabled={loading || googleLoading}
+                      className="w-full h-11 pl-11 pr-4 rounded-xl bg-slate-950/60 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 text-white placeholder-slate-650 transition-all text-sm outline-none disabled:opacity-50"
                     />
                   </div>
                 </div>
@@ -201,7 +305,7 @@ function LoginForm() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || googleLoading}
                 className="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-semibold shadow-lg shadow-indigo-600/15 disabled:opacity-50 transition-all duration-300 mt-2 text-sm cursor-pointer"
               >
                 {loading ? (
@@ -234,7 +338,8 @@ function LoginForm() {
                     setError("");
                     setSuccessMsg("");
                   }}
-                  className="text-indigo-400 font-semibold hover:underline bg-transparent border-none p-0 cursor-pointer"
+                  disabled={loading || googleLoading}
+                  className="text-indigo-400 font-semibold hover:underline bg-transparent border-none p-0 cursor-pointer disabled:opacity-50 disabled:no-underline"
                 >
                   로그인 화면으로 돌아가기
                 </button>
@@ -247,7 +352,8 @@ function LoginForm() {
                       setError("");
                       setSuccessMsg("");
                     }}
-                    className="text-indigo-400 font-semibold hover:underline bg-transparent border-none p-0 cursor-pointer"
+                    disabled={loading || googleLoading}
+                    className="text-indigo-400 font-semibold hover:underline bg-transparent border-none p-0 cursor-pointer disabled:opacity-50 disabled:no-underline"
                   >
                     로그인하기
                   </button>
@@ -262,7 +368,8 @@ function LoginForm() {
                         setError("");
                         setSuccessMsg("");
                       }}
-                      className="text-indigo-400 font-semibold hover:underline bg-transparent border-none p-0 cursor-pointer"
+                      disabled={loading || googleLoading}
+                      className="text-indigo-400 font-semibold hover:underline bg-transparent border-none p-0 cursor-pointer disabled:opacity-50 disabled:no-underline"
                     >
                       새 계정 만들기
                     </button>
@@ -274,7 +381,8 @@ function LoginForm() {
                         setError("");
                         setSuccessMsg("");
                       }}
-                      className="text-xs text-slate-500 hover:text-indigo-400 transition-colors bg-transparent border-none p-0 cursor-pointer"
+                      disabled={loading || googleLoading}
+                      className="text-xs text-slate-500 hover:text-indigo-400 transition-colors bg-transparent border-none p-0 cursor-pointer disabled:opacity-50 disabled:hover:text-slate-500"
                     >
                       비밀번호를 잊으셨나요?
                     </button>
