@@ -133,13 +133,15 @@ export default function RootLayout({
                 href="https://www.kawf.kr/" 
                 target="_blank" 
                 rel="noopener noreferrer" 
-                className="flex items-center gap-2.5 px-3.5 py-2 bg-white dark:bg-stone-900/30 border border-stone-200 dark:border-stone-900 text-[10px] font-medium tracking-wider text-stone-750 dark:text-stone-300 hover:scale-[1.03] hover:bg-stone-50 hover:dark:bg-stone-900/60 hover:text-stone-950 hover:dark:text-white hover:border-stone-300 hover:dark:border-stone-800 transition-all duration-300 rounded-sm shadow-sm"
+                className="flex items-center gap-2.5 px-3.5 py-2 bg-white dark:bg-stone-900/30 border border-stone-200 dark:border-stone-900 text-[10px] font-medium tracking-wider text-stone-700 dark:text-stone-300 hover:scale-[1.03] hover:bg-stone-50 hover:dark:bg-stone-900/60 hover:text-stone-950 hover:dark:text-white hover:border-stone-300 hover:dark:border-stone-800 transition-all duration-300 rounded-sm shadow-sm"
               >
-                <img 
-                  src="/images/logo_kawf.png" 
-                  alt="한국예술인복지재단" 
-                  className="h-5 w-auto object-contain"
-                />
+                <div className="bg-white p-0.5 rounded-sm flex items-center justify-center h-5 w-5">
+                  <img 
+                    src="/images/logo_kawf.jpg" 
+                    alt="한국예술인복지재단" 
+                    className="h-full w-auto object-contain"
+                  />
+                </div>
                 <span>한국예술인복지재단</span>
               </a>
             </div>
