@@ -13,6 +13,7 @@ export default function Navigation() {
     { name: "Space", href: "/space", ko: "공간" },
     { name: "Artists", href: "/artists", ko: "작가" },
     { name: "Artworks", href: "/artworks", ko: "작품" },
+    { name: "Talk", href: "/talk", ko: "대화" },
     { name: "Class", href: "/class", ko: "수업" },
     { name: "Lab", href: "/lab", ko: "실험실" },
     { name: "Visit", href: "/visit", ko: "방문" },

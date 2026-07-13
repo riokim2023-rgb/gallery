@@ -1,50 +1,8 @@
-import { Eye, ShoppingCart } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 import Link from "next/link";
+import { artworks } from "@/lib/artworks";
 
 export default function Artworks() {
-  const artworks = [
-    {
-      id: 1,
-      title: "오현단의 햇살 I (Sunlight of Ohyeondan I)",
-      artist: "오현단길 레지던시 작가",
-      size: "70 × 70 cm",
-      medium: "Canvas with Gold Leaf & Mixed Media",
-      price: "1,200,000 KRW",
-      status: "Available",
-      image: "/images/interior_wall.jpg",
-    },
-    {
-      id: 2,
-      title: "제주 돌담의 텍스처 (Stone Wall Texture)",
-      artist: "로컬 컬래버레이터",
-      size: "50 × 50 cm",
-      medium: "Acrylic & Modeling Paste on Canvas",
-      price: "850,000 KRW",
-      status: "Reserved",
-      image: "/images/interior_detail.jpg",
-    },
-    {
-      id: 3,
-      title: "바람과 구도심 (Wind & Old Town)",
-      artist: "오현단길 레지던시 작가",
-      size: "90 × 60 cm",
-      medium: "Mixed Media with Gold Relief",
-      price: "1,500,000 KRW",
-      status: "Available",
-      image: "/images/interior_table.jpg",
-    },
-    {
-      id: 4,
-      title: "오현길 모퉁이 (Ohyuon Road Corner)",
-      artist: "어반 스케치 강사 대표작",
-      size: "40 × 40 cm",
-      medium: "Pen and Acrylic on Wood Panel",
-      price: "450,000 KRW",
-      status: "Sold Out",
-      image: "/images/exterior.jpg",
-    },
-  ];
-
   return (
     <div className="flex-1 flex flex-col canvas-texture animate-fade-in">
       <section className="py-20 px-6 max-w-7xl mx-auto w-full border-b border-stone-100 dark:border-stone-900">
@@ -105,12 +63,18 @@ export default function Artworks() {
                   재료: {art.medium}. 갤러리 1층에서 직접 실물을 감상할 수 있습니다.
                 </p>
 
-                <div className="pt-2 flex gap-4">
+                <div className="pt-2 flex gap-3">
+                  <Link
+                    href={`/talk/${art.id}`}
+                    className="flex-1 py-3 text-center bg-stone-950 text-white dark:bg-gold-500 dark:text-stone-950 text-[10px] tracking-[0.2em] uppercase font-semibold hover:bg-stone-800 dark:hover:bg-gold-400 transition-all"
+                  >
+                    Talk to Art
+                  </Link>
                   <Link
                     href="/visit"
                     className="flex-1 py-3 text-center border border-stone-200 dark:border-stone-850 hover:border-gold-500 text-[10px] tracking-[0.2em] uppercase text-stone-850 dark:text-stone-200 hover:text-gold-500 font-medium transition-all"
                   >
-                    Inquire Art
+                    Inquire
                   </Link>
                   <button
                     disabled={art.status !== "Available"}

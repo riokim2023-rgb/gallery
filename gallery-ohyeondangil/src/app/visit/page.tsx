@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Phone, Mail, Clock, Calendar, CheckCircle } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, Calendar, CheckCircle, Loader2 } from "lucide-react";
 
 export default function Visit() {
   const [formData, setFormData] = useState({
@@ -13,15 +13,41 @@ export default function Visit() {
     time: "13:00",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.email || !formData.phone || !formData.date) {
       alert("모든 필수 입력 사항을 기입해주세요.");
       return;
     }
-    setSubmitted(true);
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/visit/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setSubmitted(true);
+      } else {
+        alert(result.error || "예약 제출 중 오류가 발생했습니다. 다시 시도해 주세요.");
+      }
+    } catch (error) {
+      console.error("Error submitting reservation:", error);
+      alert("서버 연결에 실패했습니다. 네트워크 상태를 확인 후 다시 시도해 주세요.");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   return (
     <div className="flex-1 flex flex-col canvas-texture animate-fade-in">
@@ -236,9 +262,17 @@ export default function Visit() {
                 <div className="pt-4">
                   <button
                     type="submit"
-                    className="w-full py-4 bg-stone-950 text-white dark:bg-gold-500 dark:text-stone-950 text-xs tracking-[0.25em] uppercase hover:bg-gold-600 font-semibold transition-all rounded-none"
+                    disabled={isLoading}
+                    className="w-full py-4 bg-stone-950 text-white dark:bg-gold-500 dark:text-stone-950 text-xs tracking-[0.25em] uppercase hover:bg-gold-600 font-semibold transition-all rounded-none flex items-center justify-center gap-2 disabled:bg-stone-300 disabled:text-stone-500 disabled:dark:bg-stone-900 disabled:dark:text-stone-650"
                   >
-                    Confirm Booking
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="h-4.5 w-4.5 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      "Confirm Booking"
+                    )}
                   </button>
                 </div>
               </form>
